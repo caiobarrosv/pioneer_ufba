@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+
+	<!-- these are the arguments you can pass this launch file, for example 
+		paused:=true -->
+	<arg name="paused" default="false" />
+	<arg name="use_sim_time" default="true" />
+	<arg name="gui" default="true" />
+	<arg name="headless" default="false" />
+	<arg name="debug" default="false" />
+    <arg name="world" default="p3dx" />
+    <arg name="namespace_arg" default=""/>
+	<arg name="model" default="$(find pioneer_ufba)/urdf/pioneer3dx.xacro"/>
+
+	<!-- We resume the logic in empty_world.launch, changing only the name of 
+		the world to be launched -->
+	<include file="$(find gazebo_ros)/launch/empty_world.launch">
+		<arg name="world_name" default="$(find lar_gazebo)src/worlds/lar.world" doc="Default world"/>
+		<arg name="debug" value="$(arg debug)" />
+		<arg name="gui" value="$(arg gui)" />
+		<arg name="paused" value="$(arg paused)" />
+		<arg name="use_sim_time" value="$(arg use_sim_time)" />
+		<arg name="headless" value="$(arg headless)" />
+	</include>
+
+    <!-- Load the URDF into the ROS Parameter Server -->
+	<param name="robot_description" command="$(find xacro)/xacro --inorder $(arg model)"/>
+	
+
+	<!-- Run a python script to the send a service call to gazebo_ros to spawn 
+                a URDF robot -->
+	<node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model"
+                respawn="false" output="screen" args="-urdf -model p3dx -param robot_description" />
+
+
+    <!-- <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" ></node> -->
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher" />
+
+	<!-- Control file -->
+	<rosparam file="$(find pioneer_ufba)/config/pioneer_control.yaml" command="load"/>
+	<!-- <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen" ns="/$(arg namespace_arg)"  -->
+		  <!-- args="joint1_position_controller joint2_position_controller joint_state_controller"/>  -->
+	
+	<!-- <node name="base_controller_spawner" pkg="controller_manager" type="spawner"
+          args="p3dx_joint_publisher p3dx_velocity_controller shutdown-timeout 3"
+          output="screen"/> -->
+
+</launch>

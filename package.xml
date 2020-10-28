@@ -1,0 +1,37 @@
+<package>
+  <name>pioneer_ufba</name>
+  <version>0.1.0</version>
+  <description>pioneer_ufba</description>
+  <maintainer email="engcaiobarros@gmail.com">Caio Viturino</maintainer>
+
+  <license>BSD</license>
+
+  <author email="engcaiobarros@gmail.com">Caio Viturino</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <run_depend>pioneer_description_custom</run_depend>
+  <run_depend>pioneer_control</run_depend> 
+  
+  <!-- <build_export_depend>gazebo_ros</build_export_depend> -->
+  <build_depend>gazebo_ros</build_depend>
+  <run_depend>gazebo_ros</run_depend> 
+  
+  <build_depend>controller_manager</build_depend>
+  <run_depend>controller_manager</run_depend> 
+
+  <!-- <build_export_depend>roscpp</build_export_depend> -->
+  <build_depend>roscpp</build_depend>
+  <run_depend>roscpp</run_depend>
+  
+  <build_depend>rospy</build_depend>
+  <run_depend>rospy</run_depend>
+  
+  <build_depend>urdf</build_depend>
+  <run_depend>urdf</run_depend>
+
+  <export>
+    <gazebo_ros gazebo_model_path="${prefix}/models"/>
+    <gazebo_ros plugin_path="${prefix}/lib" gazebo_media_path="${prefix}" />
+  </export>
+</package>
