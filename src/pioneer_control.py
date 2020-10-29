@@ -25,9 +25,11 @@ class pioneer_control(object):
             link_pose, _ = self.transf.lookupTransform("base_link", "map", rospy.Time(0))
             print("Gt_link_pose:", gt_link_pose)
             print("link_pose:", link_pose)
-
-            self.left_wheel_pub.publish(0)
+            
+            self.left_wheel_pub.publish(0.5)
+            rospy.sleep(0.2)
             self.right_wheel_pub.publish(0)
+            rospy.sleep(0.2)
             
 
 def main():

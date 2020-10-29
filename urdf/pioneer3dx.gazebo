@@ -87,7 +87,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 			<topicName>base_pose_ground_truth</topicName>
 			<gaussianNoise>0.01</gaussianNoise>
 			<frameName>map</frameName>
-			<!-- initialize odometry for fake localization -->
 			<xyzOffsets>0 0 0</xyzOffsets>
 			<rpyOffsets>0 0 0</rpyOffsets>
 		</plugin>
@@ -131,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 	<gazebo>
 		<plugin name="set_speed_pioneer_plugin" filename="libset_speed_pioneer_plugin.so">
 		  <namespace_model>pioneer_3dx</namespace_model>
-		  <activate_pid_control>yes</activate_pid_control>                
+		  <activate_pid_control>no</activate_pid_control>                
 		  <wheel_kp>2</wheel_kp>
 		  <wheel_ki>0.0</wheel_ki>
 		  <wheel_kd>0.0</wheel_kd>
