@@ -23,26 +23,40 @@
 		<arg name="headless" value="$(arg headless)" />
 	</include>
 
+	<!-- Include move base launch file -->
+  	<!-- Use with Pioneer Gazebo simulation and Pioneer3dx robot platform -->
+  	<include file="$(find pioneer_ufba)/launch/move_base.launch"/>
+
+	<!-- Load the map -->
+	<node name="map_server" pkg="map_server" type="map_server" args="$(find pioneer_ufba)/maps/mymap2.yaml"/>
+
     <!-- Load the URDF into the ROS Parameter Server -->
 	<param name="robot_description" command="$(find xacro)/xacro --inorder $(arg model)"/>
+
+	<node name="pioneer_tf_broadcaster" pkg="pioneer_ufba" type="pioneer_tf_broadcaster"/>
+	<node name="pioneer_odom_publisher" pkg="pioneer_ufba" type="pioneer_odom_publisher"/>
+	<node pkg="tf" type="static_transform_publisher" name="map_broadcaster" args="0 0 0 0 0 0 1 odom map 10" />
 	
 
 	<!-- Run a python script to the send a service call to gazebo_ros to spawn 
                 a URDF robot -->
-	<node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model"
-                respawn="false" output="screen" args="-urdf -model p3dx -param robot_description" />
-
-
-    <!-- <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" ></node> -->
+	<node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen" 
+		  args="-urdf 
+		  		-Y -1.57
+		  	    -model p3dx 
+		  	    -param robot_description"/>
+				
+	<node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
+    	<param name="use_gui" value="false" />
+  	</node>
     <node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher" />
 
 	<!-- Control file -->
 	<rosparam file="$(find pioneer_ufba)/config/pioneer_control.yaml" command="load"/>
-	<!-- <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen" ns="/$(arg namespace_arg)"  -->
-		  <!-- args="joint1_position_controller joint2_position_controller joint_state_controller"/>  -->
-	
-	<!-- <node name="base_controller_spawner" pkg="controller_manager" type="spawner"
-          args="p3dx_joint_publisher p3dx_velocity_controller shutdown-timeout 3"
-          output="screen"/> -->
 
+	<!-- load the controllers -->
+  	<node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
+    output="screen" ns="/pioneer" args="joint1_position_controller joint2_position_controller joint_state_controller"/>
+
+	<!-- <node name="rviz" pkg="rviz" type="rviz" args="-d $(find pioneer_ufba)/etc/pioneer.rviz" output="screen"/> -->
 </launch>

@@ -3,7 +3,7 @@ import rospy, tf
 import geometry_msgs.msg, nav_msgs.msg
 from std_msgs.msg import Float32
 from math import sin, cos, tan
-from time import sleep
+from tf import TransformListener
 
 class pioneer_control(object):
     def __init__(self):
@@ -16,12 +16,19 @@ class pioneer_control(object):
         self.left_wheel_pub.publish(0.0)
         self.right_wheel_pub.publish(0.0)
 
+        self.transf = TransformListener()
+        self.transf.waitForTransform("base_link", "map", rospy.Time(0), rospy.Duration(4.0)) # rospy.Time.now()
+
     def main_control(self):
         while not rospy.is_shutdown():
-            self.left_wheel_pub.publish(0.5)
-            rospy.sleep(3)
-            self.left_wheel_pub.publish(0.0)
-            rospy.sleep(3)
+            gt_link_pose, _ = self.transf.lookupTransform("base_link", "map", rospy.Time(0))
+            link_pose, _ = self.transf.lookupTransform("base_link", "map", rospy.Time(0))
+            print("Gt_link_pose:", gt_link_pose)
+            print("link_pose:", link_pose)
+
+            self.left_wheel_pub.publish(0)
+            self.right_wheel_pub.publish(0)
+            
 
 def main():
     rospy.init_node('pioneer_vel_control')

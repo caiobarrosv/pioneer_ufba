@@ -5,6 +5,7 @@ project(pioneer_ufba)
 add_compile_options(-std=c++11)
 
 find_package(catkin REQUIRED COMPONENTS
+  actionlib
   gazebo_ros
   roscpp
   rospy
@@ -34,3 +35,11 @@ install(DIRECTORY worlds
 
 add_library(set_speed_pioneer_plugin plugin/set_speed_pioneer_plugin.cpp)
 target_link_libraries(set_speed_pioneer_plugin ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES})
+
+add_executable(pioneer_tf_broadcaster src/pioneer_tf_broadcaster.cpp)
+target_link_libraries(pioneer_tf_broadcaster ${catkin_LIBRARIES})
+add_dependencies(pioneer_tf_broadcaster ${catkin_EXPORTED_TARGETS})
+
+add_executable(pioneer_odom_publisher src/pioneer_odom_publisher.cpp)
+target_link_libraries(pioneer_odom_publisher ${catkin_LIBRARIES})
+add_dependencies(pioneer_odom_publisher ${catkin_EXPORTED_TARGETS})
