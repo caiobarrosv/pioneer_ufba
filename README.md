@@ -9,3 +9,10 @@ O modelo do pioneer utilizado foi baseado nos seguintes repositórios:
 - https://github.com/SD-Robot-Vision/PioneerModel
 
 Não esqueça de visitar os repositórios citados, dar uma estrela e fazer o clone! São excelentes materiais :)
+
+----
+
+Pacotes necessários:
+
+python -m pip install -U pip setuptools
+python -m pip install matplotlib
