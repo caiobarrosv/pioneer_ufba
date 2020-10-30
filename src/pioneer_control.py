@@ -8,6 +8,9 @@ from tf import TransformListener
 from tf.transformations import euler_from_quaternion
 import numpy as np
 import matplotlib.pyplot as plt
+import csv
+import pandas as pd
+import os
 
 class pioneer_control(object):
     def __init__(self):
@@ -69,11 +72,19 @@ class pioneer_control(object):
         robot_plot = plt.plot(self.robot_path_x, self.robot_path_y, 'k', label='Path executed')
 
         plt.ylabel('Robot path comparison')
-        plt.ylim(-2, 2)
-        plt.xlim(-2, 2)
         plt.legend()
         plt.grid()
+        plt.tight_layout()
         plt.show()
+    
+    def save_array_to_csv(self):
+        script_path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'csv_files'))
+        
+        df = pd.DataFrame({"x" : self.gt_path_x, "y" : self.gt_path_y})
+        df.to_csv(script_path + "/" + "ground_truth_path.csv", index=False)
+
+        df = pd.DataFrame({"x" : self.robot_path_x, "y" : self.robot_path_y})
+        df.to_csv(script_path + "/" + "robot_path.csv", index=False)
     
     def diff_model(self, vx, w):
         """
@@ -121,7 +132,7 @@ class pioneer_control(object):
         t1 = rospy.get_rostime().secs
         t_inicial = rospy.get_rostime().secs
         t_lim = 0
-        tempo_de_simulacao = 100
+        tempo_de_simulacao = 40
         while not rospy.is_shutdown() and t_lim < tempo_de_simulacao:
             # Armazenando a pose real do robo
             pose_robot = self.get_robot_actual_state()
@@ -155,7 +166,8 @@ class pioneer_control(object):
             t_lim = (t1 - t_inicial)
 
         self.publish_robot_vel(0, 0)
-        self.plot_path()
+        self.save_array_to_csv()
+        self.plot_path()        
 
 def main():
     rospy.init_node('pioneer_vel_control')

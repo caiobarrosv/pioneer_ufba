@@ -16,3 +16,5 @@ Pacotes necessários:
 
 python -m pip install -U pip setuptools
 python -m pip install matplotlib
+python -m pip install django
+python -m pip install pandas
