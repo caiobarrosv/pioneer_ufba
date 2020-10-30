@@ -25,14 +25,6 @@ class pioneer_control(object):
         self.r = 0.09
         self.transf = TransformListener()
 
-        ##################
-        # ROBOT PATHS
-        ##################
-        self.gt_path_x = []
-        self.gt_path_y = []
-        self.robot_path_x = []
-        self.robot_path_y = []
-
     def get_robot_actual_state(self):      
         """
         Acquire the actual robot pose
@@ -70,12 +62,17 @@ class pioneer_control(object):
         vel.angular.z = 0.0
         self.robot_cmd_vel.publish(vel)
 
-    def plot_path(self, x, y):
-        plt.plot(x[0], y[0], 'bo') 
-        plt.plot(x, y, 'r') 
+    def plot_path(self):
+        plt.plot(self.gt_path_x[0], self.gt_path_y[0], 'bo')  # mark initial position
+        gt_plot = plt.plot(self.gt_path_x, self.gt_path_y, 'r', label='Ground truth')         # mark path
+
+        robot_plot = plt.plot(self.robot_path_x, self.robot_path_y, 'k', label='Path executed')
+
         plt.ylabel('Robot path comparison')
-        plt.ylim(-10, 10)
-        plt.xlim(-10, 10)
+        plt.ylim(-2, 2)
+        plt.xlim(-2, 2)
+        plt.legend()
+        plt.grid()
         plt.show()
     
     def diff_model(self, vx, w):
@@ -94,7 +91,13 @@ class pioneer_control(object):
         vd = wd * r
         return we, wd, ve, vd
     
-    def get_gt_path(self, time):
+    def publish_robot_vel(self, vx, w):
+        vel = Twist()
+        vel.linear.x = vx
+        vel.angular.z = w
+        self.robot_cmd_vel.publish(vel)
+    
+    def main_control(self):
         """
         Calculate the robot path based on the ICC method
         """
@@ -105,14 +108,28 @@ class pioneer_control(object):
         theta = pose[-1] # initial robot orientation
         
         self.gt_path_x = [pose[0]]
-        self.gt_path_y = [pose[1]]        
+        self.gt_path_y = [pose[1]]
+        self.robot_path_x = [pose[0]]
+        self.robot_path_y = [pose[1]]
         
         vx = 0.5 # linear velocity
-        w = 0.1 # angular velocity
+        w = 0.4 # angular velocity
         we, wd, ve, vd = self.diff_model(vx, w)
-
-        dt = 0.1        
-        for i in np.arange(0, time, dt):
+                
+        raw_input("Aperte enter para iniciar a simulacao")
+        self.publish_robot_vel(vx, w)
+        t1 = rospy.get_rostime().secs
+        t_inicial = rospy.get_rostime().secs
+        t_lim = 0
+        tempo_de_simulacao = 100
+        while not rospy.is_shutdown() and t_lim < tempo_de_simulacao:
+            # Armazenando a pose real do robo
+            pose_robot = self.get_robot_actual_state()
+            self.robot_path_x.append(pose_robot[0])
+            self.robot_path_y.append(pose_robot[1])
+            
+            # Armazenando o ground truth
+            dt = rospy.get_rostime().secs - t1
             if vd == ve:
                 pose = pose + np.array([vx*cos(theta)*dt, vx*sin(theta)*dt, 0])
                 theta = pose[-1]
@@ -127,25 +144,18 @@ class pioneer_control(object):
                 ICC = np.array([ICC_x, ICC_y])
 
                 rot_z_mat = self.rot_z_2d(omega*dt)
-
-                ICC_origin = np.array([pose[0] - ICC_x, pose[1] - ICC_y])
-
                 theta = theta + omega*dt
-
+                
+                ICC_origin = np.array([pose[0] - ICC_x, pose[1] - ICC_y])
                 pose = np.matmul(rot_z_mat, ICC_origin) + ICC
                 
                 self.gt_path_x.append(pose[0])
-                self.gt_path_y.append(pose[1])
-        
-    def main_control(self):
-        # self.get_gt_path(100)
-        raw_input("Continue")
-        while not rospy.is_shutdown():
-            vel = Twist()
-            vel.linear.x = 0.5
-            vel.angular.z = 0.1
-            self.robot_cmd_vel.publish(vel)            
-            continue            
+                self.gt_path_y.append(pose[1])         
+            t1 = rospy.get_rostime().secs
+            t_lim = (t1 - t_inicial)
+
+        self.publish_robot_vel(0, 0)
+        self.plot_path()
 
 def main():
     rospy.init_node('pioneer_vel_control')
