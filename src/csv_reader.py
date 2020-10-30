@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 
 def plot_path(gt_x, gt_y, robot_x, robot_y):
     plt.plot(gt_x[0], gt_y[0], 'bo')  # mark initial position
-    plt.plot(gt_x, gt_y, 'r', label='Ground truth') 
+    plt.plot(gt_x, gt_y, '-r', label='Ground truth') 
 
-    plt.plot(robot_x, robot_y, 'k', label='Path executed')
+    plt.plot(robot_x, robot_y, '-k', label='Path executed')
 
     plt.title('Robot path comparison')
     plt.legend()

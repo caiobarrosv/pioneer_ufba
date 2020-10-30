@@ -21,11 +21,15 @@ class pioneer_control(object):
         self.right_wheel_pub = rospy.Publisher('/pioneer_3dx/right_wheel_speed', Float32, queue_size=10)
         self.robot_cmd_vel = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
 
-        ##################
+        ####################
         # ROBOT PARAMETERS
-        ##################
+        ####################
         self.L = 0.316 # distance between wheels
-        self.r = 0.09
+        self.r = 0.09 # wheel radius
+
+        ####################
+        # ROS 
+        ####################
         self.transf = TransformListener()
 
     def get_robot_actual_state(self):      
@@ -66,18 +70,24 @@ class pioneer_control(object):
         self.robot_cmd_vel.publish(vel)
 
     def plot_path(self):
+        """
+        Plot the robot ground truth and simulated path
+        """
         plt.plot(self.gt_path_x[0], self.gt_path_y[0], 'bo')  # mark initial position
         gt_plot = plt.plot(self.gt_path_x, self.gt_path_y, 'r', label='Ground truth')         # mark path
 
         robot_plot = plt.plot(self.robot_path_x, self.robot_path_y, 'k', label='Path executed')
 
-        plt.ylabel('Robot path comparison')
+        plt.title('Robot path comparison')
         plt.legend()
         plt.grid()
         plt.tight_layout()
         plt.show()
     
     def save_array_to_csv(self):
+        """
+        Save the coordinates into csv files
+        """
         script_path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'csv_files'))
         
         df = pd.DataFrame({"x" : self.gt_path_x, "y" : self.gt_path_y})
@@ -103,6 +113,9 @@ class pioneer_control(object):
         return we, wd, ve, vd
     
     def publish_robot_vel(self, vx, w):
+        """
+        Send the velocity command to the robot
+        """
         vel = Twist()
         vel.linear.x = vx
         vel.angular.z = w
@@ -127,20 +140,20 @@ class pioneer_control(object):
         w = 0.4 # angular velocity
         we, wd, ve, vd = self.diff_model(vx, w)
                 
-        raw_input("Aperte enter para iniciar a simulacao")
+        raw_input("Press enter to begin the simulation")
         self.publish_robot_vel(vx, w)
-        t1 = rospy.get_rostime().secs
+        t_final = rospy.get_rostime().secs
         t_inicial = rospy.get_rostime().secs
+        dt = 0.01
         t_lim = 0
         tempo_de_simulacao = 40
         while not rospy.is_shutdown() and t_lim < tempo_de_simulacao:
-            # Armazenando a pose real do robo
+            # Stores the robot's real pose into an array
             pose_robot = self.get_robot_actual_state()
             self.robot_path_x.append(pose_robot[0])
             self.robot_path_y.append(pose_robot[1])
             
-            # Armazenando o ground truth
-            dt = rospy.get_rostime().secs - t1
+            # Stores the robot calculated pose into an array
             if vd == ve:
                 pose = pose + np.array([vx*cos(theta)*dt, vx*sin(theta)*dt, 0])
                 theta = pose[-1]
@@ -162,12 +175,13 @@ class pioneer_control(object):
                 
                 self.gt_path_x.append(pose[0])
                 self.gt_path_y.append(pose[1])         
-            t1 = rospy.get_rostime().secs
-            t_lim = (t1 - t_inicial)
+            t_final = rospy.get_rostime().secs
+            t_lim = (t_final - t_inicial)
+            rospy.sleep(dt)
 
-        self.publish_robot_vel(0, 0)
-        self.save_array_to_csv()
-        self.plot_path()        
+        self.publish_robot_vel(0, 0) # Stop the robot
+        self.save_array_to_csv() # Save the coordinates in csv files
+        self.plot_path() # plot the paths
 
 def main():
     rospy.init_node('pioneer_vel_control')
