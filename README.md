@@ -14,7 +14,7 @@ Não esqueça de visitar os repositórios citados, dar uma estrela e fazer o clo
 
 Pacotes necessários:
 
-python -m pip install -U pip setuptools
-python -m pip install matplotlib
-python -m pip install django
-python -m pip install pandas
+- python -m pip install -U pip setuptools
+- python -m pip install matplotlib
+- python -m pip install django
+- python -m pip install pandas
