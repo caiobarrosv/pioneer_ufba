@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 import rospy
-from geometry_msgs.msg import Twist, PoseStamped
+from geometry_msgs.msg import Twist
 from std_msgs.msg import Float32
 from nav_msgs.msg import Odometry
-from math import sin, cos, tan, atan2
+from math import sin, cos, tan
 from tf import TransformListener
 from tf.transformations import euler_from_quaternion
 import numpy as np
@@ -17,10 +17,10 @@ class pioneer_control(object):
         ####################
         # DECLARE PUBLISHERS
         ####################
+        self.left_wheel_pub = rospy.Publisher('/pioneer_3dx/left_wheel_speed', Float32, queue_size=10)
+        self.right_wheel_pub = rospy.Publisher('/pioneer_3dx/right_wheel_speed', Float32, queue_size=10)
         self.robot_cmd_vel = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
 
-        self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.move_goal_callback, queue_size=10)
-        
         ####################
         # ROBOT PARAMETERS
         ####################
@@ -32,42 +32,7 @@ class pioneer_control(object):
         ####################
         self.transf = TransformListener()
 
-    def move_goal_callback(self, msg):
-        """
-        Acquire goal
-        """
-        xt = msg.pose.position.x
-        yt = msg.pose.position.y
-        x = msg.pose.orientation.x
-        y = msg.pose.orientation.y
-        z = msg.pose.orientation.z
-        w = msg.pose.orientation.w
-        thetat = euler_from_quaternion([x, y, z, w])[-1]
-        self.goal_pose = [xt, yt, thetat]
-
-        # print("Goal position: ", self.goal_pose)
-        # [x, y, theta] = self.get_robot_actual_pose()
-        # heading_angle, theta = self.get_robot_state_control(xt, yt, thetat, x, y, theta)
-        # print("Heading angle: ", heading_angle)
-        # print("Theta: ", theta)
-
-    def get_robot_state_control(self, xt, yt, target_angle, xr, yr, robot_angle):
-        """
-        robot_angle : Angle of the robot related to the map frame
-        target_angle : Angle of the target related to the map frame
-        """
-        phi = atan2(yt - yr, xt - xr)
-        heading_angle = robot_angle - phi
-        theta = target_angle - phi
-
-        return heading_angle, theta
-    
-    def control_loop(self, vx, heading_angle, theta):
-        dr = -vx * cos(heading_angle)
-        dtheta = v/r * sin(heading_angle)
-        dheading_angle = v/r * sin(heading_angle) + omega
-
-    def get_robot_actual_pose(self):      
+    def get_robot_actual_state(self):      
         """
         Acquire the actual robot pose
         """  
@@ -111,7 +76,7 @@ class pioneer_control(object):
         plt.plot(self.gt_path_x[0], self.gt_path_y[0], 'bo')  # mark initial position
         gt_plot = plt.plot(self.gt_path_x, self.gt_path_y, 'r', label='Ground truth')         # mark path
 
-        robot_plot = plt.plot(self.odometry_path_x, self.odometry_path_y, 'k', label='Odometria')
+        robot_plot = plt.plot(self.robot_path_x, self.robot_path_y, 'k', label='Path executed')
 
         plt.title('Robot path comparison')
         plt.legend()
@@ -128,7 +93,7 @@ class pioneer_control(object):
         df = pd.DataFrame({"x" : self.gt_path_x, "y" : self.gt_path_y})
         df.to_csv(script_path + "/" + "ground_truth_path.csv", index=False)
 
-        df = pd.DataFrame({"x" : self.odometry_path_x, "y" : self.odometry_path_y})
+        df = pd.DataFrame({"x" : self.robot_path_x, "y" : self.robot_path_y})
         df.to_csv(script_path + "/" + "robot_path.csv", index=False)
     
     def diff_model(self, vx, w):
@@ -156,58 +121,26 @@ class pioneer_control(object):
         vel.angular.z = w
         self.robot_cmd_vel.publish(vel)
     
-    def odometry(self, vx, w, dt, pose, theta, gt_pose):
-        """
-        This method calculates and stores the odometry and the robot's pose from Gazebo 
-        as arrays for comparison
-        """
-        L = self.L
-        r = self.r
-
-        self.gt_path_x.append(gt_pose[0])
-        self.gt_path_y.append(gt_pose[1])
-        we, wd, ve, vd = self.diff_model(vx, w)
-
-        if vd == ve:
-            pose = pose + np.array([vx*cos(theta)*dt, vx*sin(theta)*dt, 0])
-            theta = pose[-1]
-            self.odometry_path_x.append(pose[0])
-            self.odometry_path_y.append(pose[1])
-        else:
-            R = (L / 2) * ((vd + ve) / (vd - ve))
-            omega = (vd - ve) / L
-            
-            ICC_x = pose[0] - R*sin(theta)
-            ICC_y = pose[1] + R*cos(theta)
-            ICC = np.array([ICC_x, ICC_y])
-            rot_z_mat = self.rot_z_2d(omega*dt)
-            theta = theta + omega*dt
-            
-            ICC_origin = np.array([pose[0] - ICC_x, pose[1] - ICC_y])
-            pose = np.matmul(rot_z_mat, ICC_origin) + ICC
-            
-            self.odometry_path_x.append(pose[0])
-            self.odometry_path_y.append(pose[1])
-        return pose, theta
-    
     def main_control(self):
         """
         Calculate the robot path based on the ICC method
         """
+        L = self.L
+        r = self.r
 
-        odometry_pose = self.get_robot_actual_pose()
-        odometry_theta = odometry_pose[-1] # initial robot orientation
+        pose = self.get_robot_actual_state()
+        theta = pose[-1] # initial robot orientation
         
-        self.gt_path_x = [odometry_pose[0]]
-        self.gt_path_y = [odometry_pose[1]]
-        # The initial pose of the odometry is set equal to the actual robot's pose
-        self.odometry_path_x = [odometry_pose[0]] 
-        self.odometry_path_y = [odometry_pose[1]]
+        self.gt_path_x = [pose[0]]
+        self.gt_path_y = [pose[1]]
+        self.robot_path_x = [pose[0]]
+        self.robot_path_y = [pose[1]]
         
         vx = 0.5 # linear velocity
         w = 0.4 # angular velocity
-                        
-        raw_input("Choose a goal and then press Enter to start the simulation.")
+        we, wd, ve, vd = self.diff_model(vx, w)
+                
+        raw_input("Press enter to begin the simulation")
         self.publish_robot_vel(vx, w)
         t_final = rospy.get_rostime().secs
         t_inicial = rospy.get_rostime().secs
@@ -215,11 +148,33 @@ class pioneer_control(object):
         t_lim = 0
         tempo_de_simulacao = 10
         while not rospy.is_shutdown() and t_lim < tempo_de_simulacao:
-            # Stores the robot's simulated pose (Ground truth pose) into an array
-            gt_pose = self.get_robot_actual_pose()
+            # Stores the robot's real pose into an array
+            pose_robot = self.get_robot_actual_state()
+            self.robot_path_x.append(pose_robot[0])
+            self.robot_path_y.append(pose_robot[1])
             
-            odometry_pose, odometry_theta = self.odometry(vx, w, dt, odometry_pose, odometry_theta, gt_pose)
+            # Stores the robot calculated pose into an array
+            if vd == ve:
+                pose = pose + np.array([vx*cos(theta)*dt, vx*sin(theta)*dt, 0])
+                theta = pose[-1]
+                self.gt_path_x.append(pose[0])
+                self.gt_path_y.append(pose[1])
+            else:
+                R = (L / 2) * ((vd + ve) / (vd - ve))
+                omega = (vd - ve) / L
+                
+                ICC_x = pose[0] - R*sin(theta)
+                ICC_y = pose[1] + R*cos(theta)
+                ICC = np.array([ICC_x, ICC_y])
 
+                rot_z_mat = self.rot_z_2d(omega*dt)
+                theta = theta + omega*dt
+                
+                ICC_origin = np.array([pose[0] - ICC_x, pose[1] - ICC_y])
+                pose = np.matmul(rot_z_mat, ICC_origin) + ICC
+                
+                self.gt_path_x.append(pose[0])
+                self.gt_path_y.append(pose[1])         
             t_final = rospy.get_rostime().secs
             t_lim = (t_final - t_inicial)
             print(t_lim)

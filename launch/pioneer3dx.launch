@@ -25,10 +25,10 @@
 
 	<!-- Include move base launch file -->
   	<!-- Use with Pioneer Gazebo simulation and Pioneer3dx robot platform -->
-  	<include file="$(find pioneer_ufba)/launch/move_base.launch"/>
+  	<!-- <include file="$(find pioneer_ufba)/launch/move_base.launch"/> -->
 
 	<!-- Load the map -->
-	<node name="map_server" pkg="map_server" type="map_server" args="$(find pioneer_ufba)/maps/mymap2.yaml"/>
+	<!-- <node name="map_server" pkg="map_server" type="map_server" args="$(find pioneer_ufba)/maps/mymap2.yaml"/> -->
 
     <!-- Load the URDF into the ROS Parameter Server -->
 	<param name="robot_description" command="$(find xacro)/xacro --inorder $(arg model)"/>
@@ -37,7 +37,6 @@
 	<node name="pioneer_odom_publisher" pkg="pioneer_ufba" type="pioneer_odom_publisher"/>
 	<node pkg="tf" type="static_transform_publisher" name="map_broadcaster" args="0 0 0 0 0 0 1 odom map 20" /> <!-- child parent-->
 	
-
 	<!-- Run a python script to the send a service call to gazebo_ros to spawn 
                 a URDF robot -Y -1.57-->
 	<node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen" 
