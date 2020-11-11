@@ -5,6 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /TF1/Frames1
+        - /Marker1
       Splitter Ratio: 0.623268723
     Tree Height: 180
   - Class: rviz/Selection
@@ -159,8 +160,6 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        map:
-          {}
         odom:
           base_link:
             front_sonar:
@@ -179,6 +178,8 @@ Visualization Manager:
                   {}
             top_plate:
               {}
+          map:
+            {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -277,6 +278,14 @@ Visualization Manager:
       Topic: /path_odometry
       Unreliable: false
       Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /marker_goal
+      Name: Marker
+      Namespaces:
+        marker: true
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -302,25 +311,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 6.18077707
+      Distance: 8.22181129
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.434210539
-        Y: -2.47955298
-        Z: 0.0852771625
+        X: -1.55378723
+        Y: -0.430086732
+        Z: -1.57732701
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 1.56979632
+      Pitch: 1.33979702
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.71359348
+      Yaw: 4.71427393
     Saved: ~
 Window Geometry:
   Displays:
