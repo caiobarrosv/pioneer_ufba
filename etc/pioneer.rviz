@@ -4,6 +4,8 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
+        - /Global Options1
+        - /TF1
         - /TF1/Frames1
         - /Marker1
       Splitter Ratio: 0.623268723
@@ -283,12 +285,12 @@ Visualization Manager:
       Marker Topic: /marker_goal
       Name: Marker
       Namespaces:
-        marker: true
+        {}
       Queue Size: 100
       Value: true
   Enabled: true
   Global Options:
-    Background Color: 48; 48; 48
+    Background Color: 255; 255; 255
     Default Light: true
     Fixed Frame: map
     Frame Rate: 30
@@ -311,25 +313,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 8.22181129
+      Distance: 7.75836611
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -1.55378723
-        Y: -0.430086732
-        Z: -1.57732701
+        X: -0.0170331039
+        Y: -0.106317267
+        Z: -1.57699966
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 1.33979702
+      Pitch: 1.56479633
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.71427393
+      Yaw: 4.70927525
     Saved: ~
 Window Geometry:
   Displays:

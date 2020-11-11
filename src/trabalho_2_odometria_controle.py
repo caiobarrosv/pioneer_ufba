@@ -3,6 +3,7 @@ import rospy
 from geometry_msgs.msg import Twist, PoseStamped
 from nav_msgs.msg import Odometry, Path
 from visualization_msgs.msg import Marker
+import math
 from math import sin, cos, tan, atan2, atan, pi
 from tf import TransformListener
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
@@ -57,6 +58,7 @@ class pioneer_control(object):
         self.odometry_path_id = 0
         self.ground_truth_path = []
         self.gt_path_id = 0
+        self.goal_pose = [-5, 0, -pi]
         
     def publish_goal(self):
         marker = Marker()
@@ -139,7 +141,7 @@ class pioneer_control(object):
         z = msg.pose.orientation.z
         w = msg.pose.orientation.w
         thetat = euler_from_quaternion([x, y, z, w])[-1]
-        self.goal_pose = [xt, yt, thetat]        
+        # self.goal_pose = [xt, yt, thetat]        
 
     def get_robot_actual_pose(self):      
         """
@@ -324,9 +326,20 @@ class pioneer_control(object):
         [xr, yr, robot_angle] = odometry_pose
 
         phi = atan2(yt - yr, xt - xr)
-        heading_angle = robot_angle - phi # ok
+        
+        heading_angle = robot_angle - phi # delta
         theta = target_angle - phi
-        # print('Theta: ', theta)
+        
+        if heading_angle < -pi:
+            heading_angle += 2*pi
+        elif heading_angle > pi:
+            heading_angle -= 2*pi
+        
+        if theta < -pi:
+            theta += 2*pi
+        elif theta > pi:
+            theta -= 2*pi
+
         dist_r = np.linalg.norm(np.array((xt, yt)) - np.array((xr, yr)))
 
         return heading_angle, theta, dist_r
@@ -384,7 +397,7 @@ class pioneer_control(object):
         dt = 0.15 # Time interval
         
         dist_r = 10
-        thresh = 0.03
+        thresh = 0.02
         time = 0
         while not rospy.is_shutdown() and dist_r > thresh:
             # Plot the goal in RVIZ
@@ -398,14 +411,14 @@ class pioneer_control(object):
             # Calculate the control signals
             vx, w, dist_r = self.control_loop(v_max)
             
-            # Send the linear and angular velocity to the robot
-            self.publish_robot_vel(vx, w)
-            
             # Update the robot ground truth state
             self.update_robot_gt_state(gt_pose[0:2], gt_pose[-1])
             
             # Robot's odometry
             self.odometry(vx, w, dt)
+
+            # Send the linear and angular velocity to the robot
+            self.publish_robot_vel(vx, w)
 
             time += dt
             self.time_interval.append(time) # Used to plot the data

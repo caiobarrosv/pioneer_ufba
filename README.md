@@ -18,3 +18,45 @@ Pacotes necessários:
 - python -m pip install matplotlib
 - python -m pip install django
 - python -m pip install pandas
+
+----
+
+## Tutorial:
+
+### Passo 1:
+
+- Crie uma pasta na home com um nome qualquer (ex: ufba_ws) e uma pasta src dentro da pasta ufba_ws.
+    ```bash
+    mkdir -p ~/ufba_ws/src
+    ```
+
+### Passo 2:
+- Faça o clone deste repositório para dentro da pasta src
+  ```bash
+  cd ~/ufba_ws/src
+  git clone https://github.com/caiobarrosv/pioneer_ufba
+  ```
+
+### Passo 3:
+- Compile o workspace
+    ```bash
+    cd ~/ufba_ws
+    catkin_make
+    ```
+
+### Passo 4:
+- Use o launch pioneer3dx.launch para abrir o Gazebo e RViz
+   ```bash
+   roslaunch pioneer_ufba pioneer3dx.launch
+   ```
+
+### Passo 5:
+- Caso queira utilizar o modelo somente com odometria e sem controlador, use:
+    ```bash
+    rosrun pioneer_ufba trabalho_1_odometria.py
+    ```
+
+- Caso queira utilizar o modelo com odometria + controlador, use:
+   ```bash
+    rosrun pioneer_ufba trabalho_2_odometria_controle.py
+    ```

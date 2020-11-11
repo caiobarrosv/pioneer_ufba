@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 import rospy
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, PoseStamped
 from std_msgs.msg import Float32
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import Odometry, Path
 from math import sin, cos, tan
 from tf import TransformListener
 from tf.transformations import euler_from_quaternion
@@ -17,10 +17,10 @@ class pioneer_control(object):
         ####################
         # DECLARE PUBLISHERS
         ####################
-        self.left_wheel_pub = rospy.Publisher('/pioneer_3dx/left_wheel_speed', Float32, queue_size=10)
-        self.right_wheel_pub = rospy.Publisher('/pioneer_3dx/right_wheel_speed', Float32, queue_size=10)
         self.robot_cmd_vel = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
-
+        self.odometry_path_pub = rospy.Publisher('/path_odometry', Path, queue_size=1)
+        self.gt_path_pub = rospy.Publisher('/path_ground_truth', Path, queue_size=1)
+        
         ####################
         # ROBOT PARAMETERS
         ####################
@@ -31,6 +31,11 @@ class pioneer_control(object):
         # ROS 
         ####################
         self.transf = TransformListener()
+
+        self.odometry_path = []
+        self.odometry_path_id = 0
+        self.ground_truth_path = []
+        self.gt_path_id = 0
 
     def get_robot_actual_state(self):      
         """
@@ -52,6 +57,42 @@ class pioneer_control(object):
         rot_z_matrix = np.array([[cos(x), -sin(x)],
                                  [sin(x),  cos(x)]])
         return rot_z_matrix
+    
+    def publish_path_rviz_ground_truth(self, pose):
+        """
+        Publish the ground truth path to RVIZ
+
+        Arguments:
+            pose (list):Ground truth position (X and Y) of the robot
+        """
+        # Publish path in RVIZ
+        navPath = Path()
+        navPath.header.frame_id = "map"
+        pos = PoseStamped()
+        pos.header.stamp = rospy.Time(0)
+        pos.pose.position.x = pose[0]
+        pos.pose.position.y = pose[1]
+        self.ground_truth_path.append(pos)
+        navPath.poses = self.ground_truth_path
+        self.gt_path_pub.publish(navPath)
+    
+    def publish_path_rviz_odometry(self, pose):
+        """
+        Publish the odometry path to RVIZ
+
+        Arguments:
+            pose (list):Position X and Y of the robot
+        """
+        # Publish path in RVIZ
+        navPath = Path()
+        navPath.header.frame_id = "map"
+        pos = PoseStamped()
+        pos.header.stamp = rospy.Time(0)
+        pos.pose.position.x = pose[0]
+        pos.pose.position.y = pose[1]
+        self.odometry_path.append(pos)
+        navPath.poses = self.odometry_path
+        self.odometry_path_pub.publish(navPath)
 
     def np_transp(self, matrix):
         """
@@ -142,14 +183,13 @@ class pioneer_control(object):
                 
         raw_input("Press enter to begin the simulation")
         self.publish_robot_vel(vx, w)
-        t_final = rospy.get_rostime().secs
-        t_inicial = rospy.get_rostime().secs
-        dt = 0.01
+        dt = 0.12
         t_lim = 0
         tempo_de_simulacao = 10
         while not rospy.is_shutdown() and t_lim < tempo_de_simulacao:
             # Stores the robot's real pose into an array
             pose_robot = self.get_robot_actual_state()
+            self.publish_path_rviz_ground_truth(pose_robot)
             self.robot_path_x.append(pose_robot[0])
             self.robot_path_y.append(pose_robot[1])
             
@@ -157,8 +197,6 @@ class pioneer_control(object):
             if vd == ve:
                 pose = pose + np.array([vx*cos(theta)*dt, vx*sin(theta)*dt, 0])
                 theta = pose[-1]
-                self.gt_path_x.append(pose[0])
-                self.gt_path_y.append(pose[1])
             else:
                 R = (L / 2) * ((vd + ve) / (vd - ve))
                 omega = (vd - ve) / L
@@ -173,11 +211,9 @@ class pioneer_control(object):
                 ICC_origin = np.array([pose[0] - ICC_x, pose[1] - ICC_y])
                 pose = np.matmul(rot_z_mat, ICC_origin) + ICC
                 
-                self.gt_path_x.append(pose[0])
-                self.gt_path_y.append(pose[1])         
-            t_final = rospy.get_rostime().secs
-            t_lim = (t_final - t_inicial)
-            print(t_lim)
+            self.gt_path_x.append(pose[0])
+            self.gt_path_y.append(pose[1])         
+            self.publish_path_rviz_odometry(pose)
             rospy.sleep(dt)
 
         self.publish_robot_vel(0, 0) # Stop the robot
