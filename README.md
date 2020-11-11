@@ -44,13 +44,19 @@ Pacotes necessários:
     catkin_make
     ```
 
-### Passo 4:
+### Passo 4
+- Não esqueça de referenciar a pasta do seu workspace:
+    ```bash
+    source ~/ufba_ws/devel/setup.bash
+    ```
+
+### Passo 5:
 - Use o launch pioneer3dx.launch para abrir o Gazebo e RViz
    ```bash
    roslaunch pioneer_ufba pioneer3dx.launch
    ```
 
-### Passo 5:
+### Passo 6:
 - Caso queira utilizar o modelo somente com odometria e sem controlador, use:
     ```bash
     rosrun pioneer_ufba trabalho_1_odometria.py
