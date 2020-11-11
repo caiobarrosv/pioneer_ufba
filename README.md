@@ -12,16 +12,7 @@ Não esqueça de visitar os repositórios citados, dar uma estrela e fazer o clo
 
 ----
 
-Pacotes necessários:
-
-- python -m pip install -U pip setuptools
-- python -m pip install matplotlib
-- python -m pip install django
-- python -m pip install pandas
-
-----
-
-## Tutorial:
+## > Tutorial - Clone e build:
 
 ### Passo 1:
 
@@ -50,13 +41,39 @@ Pacotes necessários:
     source ~/ufba_ws/devel/setup.bash
     ```
 
-### Passo 5:
+-----
+
+## > Instalação
+
+### Passo 1:
+    - Encontre a pasta install dentro deste repositório:
+    ```bash
+    roscd pioneer_ufba/install
+    ```
+
+### Passo 2:
+    - Torne o arquivo install.sh um executável:
+    ```bash
+    sudo chmod +x .install.sh
+    ```
+
+### Passo 3:
+    - Rode o arquivo install.sh. Isso irá instalar todos os pacotes necessários para rodar os nodes.
+    ```bash
+    ./.install.sh
+    ```
+
+-----
+
+## > Rodando os nodes
+
+### Passo 1:
 - Use o launch pioneer3dx.launch para abrir o Gazebo e RViz
    ```bash
    roslaunch pioneer_ufba pioneer3dx.launch
    ```
 
-### Passo 6:
+### Passo 2:
 - Caso queira utilizar o modelo somente com odometria e sem controlador, use:
     ```bash
     rosrun pioneer_ufba trabalho_1_odometria.py
