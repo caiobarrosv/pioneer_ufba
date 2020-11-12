@@ -46,19 +46,19 @@ Não esqueça de visitar os repositórios citados, dar uma estrela e fazer o clo
 ## > Instalação
 
 ### Passo 1:
-    - Encontre a pasta install dentro deste repositório:
+- Encontre a pasta install dentro deste repositório:
     ```bash
     roscd pioneer_ufba/install
     ```
 
 ### Passo 2:
-    - Torne o arquivo install.sh um executável:
+- Torne o arquivo install.sh um executável:
     ```bash
     sudo chmod +x .install.sh
     ```
 
 ### Passo 3:
-    - Rode o arquivo install.sh. Isso irá instalar todos os pacotes necessários para rodar os nodes.
+- Rode o arquivo install.sh. Isso irá instalar todos os pacotes necessários para rodar os nodes.
     ```bash
     ./.install.sh
     ```
