@@ -25,6 +25,7 @@ sudo apt-get install ros-kinetic-slam-gmapping
 sudo apt-get install ros-kinetic-ros-control 
 sudo apt-get install ros-kinetic-ros-controllers 
 sudo apt-get install ros-kinetic-rviz
+sudo apt-get install ros-kinetic-moveit-ros-visualization
 
 echo '###### Installing and upgrading pip | pathlib ######'
 apt install python-pip
