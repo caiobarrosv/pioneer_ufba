@@ -53,14 +53,20 @@ class pioneer_control(object):
         self.robot_linear_velocity = []
         self.robot_angular_velocity = []
         self.time_interval = []
+        self.left_wheel_angular_velocity = []
+        self.right_wheel_angular_velocity = []
 
         self.odometry_path = []
         self.odometry_path_id = 0
         self.ground_truth_path = []
         self.gt_path_id = 0
-        self.goal_pose = [-5, 0, -pi]
-        
-    def publish_goal(self):
+        self.path_curvature = []
+        poses = [[0, 5, 0], [3.54, 3.54, 1.57/2], [5, 0, 0], [4.5, -2.17, -0.785], [2.5, -4.33, -1.57],
+                 [0, -5, -1.57], [-3.54, -3.54, -2.36], [-5, 0, -3.14], [-3.54, 3.54, 0]]
+        self.goal_pose = poses[1]
+        self.path = [[1, 1, 1.57/2], [3, 1, 0], [3, -3, -2.36], [-3, -3, 1.57], [-3, 0, 1.57], [0, 0, 0]]
+                
+    def publish_goal(self, goal_pose):
         marker = Marker()
         marker.header.frame_id = "map"
         marker.id = 200
@@ -68,9 +74,9 @@ class pioneer_control(object):
         marker.ns = "marker"
         marker.type = marker.ARROW
         marker.action = marker.ADD
-        marker.pose.position.x = self.goal_pose[0]
-        marker.pose.position.y = self.goal_pose[1]
-        angle = quaternion_from_euler(0.0, 0.0, self.goal_pose[2])
+        marker.pose.position.x = goal_pose[0]
+        marker.pose.position.y = goal_pose[1]
+        angle = quaternion_from_euler(0.0, 0.0, goal_pose[2])
         marker.pose.orientation.x = angle[0]
         marker.pose.orientation.y = angle[1]
         marker.pose.orientation.z = angle[2]
@@ -214,22 +220,25 @@ class pioneer_control(object):
 
         plt.show()
     
-    def save_array_to_csv(self):
+    def save_array_to_csv(self, string):
         """
         Save the coordinates into csv files
         """
         script_path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'csv_files'))
         
         df = pd.DataFrame({"x" : self.gt_path_x, "y" : self.gt_path_y})
-        df.to_csv(script_path + "/" + "ground_truth_path.csv", index=False)
+        df.to_csv(script_path + "/" + "ground_truth_path" + "_" + string + ".csv", index=False)
 
         df = pd.DataFrame({"x" : self.odometry_path_x, "y" : self.odometry_path_y})
-        df.to_csv(script_path + "/" + "robot_path.csv", index=False)
+        df.to_csv(script_path + "/" + "robot_path" + "_" + string + ".csv", index=False)
 
         df = pd.DataFrame({"time_interval" : self.time_interval, 
                            "linear_velocity" : self.robot_linear_velocity, 
-                           "angular_velocity" : self.robot_angular_velocity})
-        df.to_csv(script_path + "/" + "robot_velocities.csv", index=False)
+                           "angular_velocity" : self.robot_angular_velocity,
+                           "path_curvature" : self.path_curvature,
+                           "left_wheel_angular" : self.left_wheel_angular_velocity,
+                           "right_wheel_angular" : self.right_wheel_angular_velocity})
+        df.to_csv(script_path + "/" + "robot_velocities" + "_" + string + ".csv", index=False)
     
     def diff_model(self, vx, w):
         """
@@ -284,6 +293,9 @@ class pioneer_control(object):
         
         we, wd, ve, vd = self.diff_model(vx, w)
 
+        self.right_wheel_angular_velocity.append(wd)
+        self.left_wheel_angular_velocity.append(we)
+
         # Last odometry data
         x = self.odometry_path_x[-1]
         y = self.odometry_path_y[-1]
@@ -310,7 +322,7 @@ class pioneer_control(object):
         self.update_odometry_state(pose, theta)
         self.publish_path_rviz_odometry(pose)
     
-    def get_robot_state_control(self, odometry_pose):
+    def get_robot_state_control(self, odometry_pose, goal_pose):
         """
         Calculate the robot states as heading angle, theta, phi, and distance rom the target
 
@@ -322,7 +334,7 @@ class pioneer_control(object):
             theta (float):Angle between the target orientation and the line of sight between the robot and the target
             disrt_r (float):Distance between the robot and the target
         """
-        [xt, yt, target_angle] = self.goal_pose
+        [xt, yt, target_angle] = goal_pose
         [xr, yr, robot_angle] = odometry_pose
 
         phi = atan2(yt - yr, xt - xr)
@@ -344,7 +356,7 @@ class pioneer_control(object):
 
         return heading_angle, theta, dist_r
     
-    def control_loop(self, v_max):
+    def control_loop(self, v_max, vx, heading_angle, theta, dist_r, transition_velocity, mode, transition_time_total):
         """
         Calculates the linar and angular velocity based on the paper entitled
         "A Smooth Control Law for Graceful Motion of Differential Wheeled Mobile Robots in 2D Environment" (Park and Kuipers, 2011)
@@ -357,14 +369,6 @@ class pioneer_control(object):
             w (float):Angular velocity (rad/s)
             disrt_r (float):Distance between the robot and the target
         """
-        # Last odometry data
-        x = self.odometry_path_x[-1]
-        y = self.odometry_path_y[-1]
-        theta = self.odometry_orientation[-1]
-        pose = [x, y, theta]
-
-        heading_angle, theta, dist_r = self.get_robot_state_control(pose)
-
         # Control parameters
         k1 = 1
         k2 = 3
@@ -375,58 +379,114 @@ class pioneer_control(object):
         # vx = v_max
 
         curvature = -1/dist_r * (k2*(heading_angle - atan(-k1*theta)) + (1 + k1/(1+(k1*theta)**2))*sin(heading_angle))
-        vx = v_max / (1 + beta*curvature**lambda_) # linear velocity
+        self.path_curvature.append(curvature)
+
+        if mode:
+            sigmoid = 1/0.98 * (1 /     (1 + math.exp(-9.2*(transition_time_total - 0.5))) - 0.01)
+            vx = vel_transition = (1 - sigmoid)*vx + sigmoid*transition_velocity
+        else:
+            vx = v_max / (1 + beta*curvature**lambda_) # linear velocity
+        
         w = curvature * vx # angular velocity
+        # print("Linear velocity: ", vx)
+        # print("Angular velocity: ", w)
         
         self.robot_linear_velocity.append(vx)
         self.robot_angular_velocity.append(w)
                 
-        return vx, w, dist_r
+        return vx, w
     
     def main_control(self):
         """
         Control the robot based on the Odometry data (calculated using the ICC method)
         and compares with the ground truth from Gazebo
         """
-        v_max = 0.5 # linear velocity
+        v_max = 0.4 # linear velocity
+        vx = v_max
                                 
         raw_input("Choose a goal and then press Enter to start the simulation.")
         
         # Diminui o tempo para 0.01. O caminho final foi bem ruim
         # Com o dt = 0.05, obtive uma boa aprox.
         dt = 0.15 # Time interval
-        
         dist_r = 10
-        thresh = 0.02
+        
+        ###########################
+        # Parameters for transition
+        # between points in the path
+        threshold_distance = 0.04
+        threshold_transition_distance = 0.1
+        transition_velocity = 0.2
+        transition_time_limit = 1
+        transition_time_total = 0
+        mode = 0
+        ###########################
+
         time = 0
-        while not rospy.is_shutdown() and dist_r > thresh:
-            # Plot the goal in RVIZ
-            self.publish_goal()
-
-            # Stores the robot's simulated pose (Ground truth pose) into an array
-            gt_pose = self.get_robot_actual_pose()
+        path_points = 2 #len(self.path)
+        path_iter = 0
+        raw_input("Path points: " + str(path_points))
+        while path_iter < path_points:
+            goal_pose = self.path[path_iter]
+            print("Goal pose: ", goal_pose)
             
-            self.publish_path_rviz_ground_truth(gt_pose)
+            # Last odometry data
+            x = self.odometry_path_x[-1]
+            y = self.odometry_path_y[-1]
+            theta = self.odometry_orientation[-1]
+            robot_pose_odometry = [x, y, theta]
+            _, _, dist_r = self.get_robot_state_control(robot_pose_odometry, goal_pose)
             
-            # Calculate the control signals
-            vx, w, dist_r = self.control_loop(v_max)
-            
-            # Update the robot ground truth state
-            self.update_robot_gt_state(gt_pose[0:2], gt_pose[-1])
-            
-            # Robot's odometry
-            self.odometry(vx, w, dt)
+            while not rospy.is_shutdown() and dist_r > threshold_distance:
+                # Plot the goal in RVIZ
+                self.publish_goal(goal_pose)
 
-            # Send the linear and angular velocity to the robot
-            self.publish_robot_vel(vx, w)
+                # Stores the robot's simulated pose (Ground truth pose) into an array
+                gt_pose = self.get_robot_actual_pose()
 
-            time += dt
-            self.time_interval.append(time) # Used to plot the data
+                self.publish_path_rviz_ground_truth(gt_pose)
 
-            rospy.sleep(dt)
+                # Last odometry data
+                x = self.odometry_path_x[-1]
+                y = self.odometry_path_y[-1]
+                theta = self.odometry_orientation[-1]
+                robot_pose_odometry = [x, y, theta]
+
+                heading_angle, theta, dist_r = self.get_robot_state_control(robot_pose_odometry, goal_pose)
+
+                if dist_r < threshold_transition_distance:
+                    mode = 1 # indicates a transition near the point in the path
+    
+                if mode == 1 and transition_time_total < transition_time_limit:
+                    transition_time_total += dt
+                else:
+                    transition_time_total = 0 # reset the transition time
+                    mode = 0 # robot is not near a point in the path
+                
+                # print("Mode: ", mode)
+                # print("Transition time total: ", transition_time_total)
+
+                # Calculate the control signals
+                vx, w = self.control_loop(v_max, vx, heading_angle, theta, dist_r, transition_velocity, mode, transition_time_total)
+
+                # Update the robot ground truth state
+                self.update_robot_gt_state(gt_pose[0:2], gt_pose[-1])
+
+                # Robot's odometry
+                self.odometry(vx, w, dt)
+
+                # Send the linear and angular velocity to the robot
+                self.publish_robot_vel(vx, w)
+
+                time += dt
+                self.time_interval.append(time) # Used to plot the data
+
+                rospy.sleep(dt)
+            path_iter += 1
+
             
         self.publish_robot_vel(0, 0) # Stop the robot
-        self.save_array_to_csv() # Save the coordinates in csv files
+        self.save_array_to_csv("path") # Save the coordinates in csv files
         self.plot_path() # plot the paths
 
 def main():
