@@ -57,6 +57,9 @@ class pioneer_control(object):
         self.left_wheel_angular_velocity = []
         self.right_wheel_angular_velocity = []
 
+        self.control_state_theta = []
+        self.control_state_heading = []
+        self.control_state_dist_r = []
         self.odometry_path = []
         self.odometry_path_id = 0
         self.ground_truth_path = []
@@ -67,11 +70,7 @@ class pioneer_control(object):
         self.slow_down_flag = []
         self.transition_flag = []
         self.speed_up_flag = []
-        poses = [[0, 5, 0], [3.54, 3.54, 1.57/2], [5, 0, 0], [4.5, -2.17, -0.785], [2.5, -4.33, -1.57],
-                 [0, -5, -1.57], [-3.54, -3.54, -2.36], [-5, 0, -3.14], [-3.54, 3.54, 0]]
-        self.goal_pose = poses[1]
-        self.path1 = [[1, 0, 0], [3, 0, 0], [3, -3, -2.36], [-3, -3, 1.57], [-3, 0, 1.57], [0, 0, 0]]
-        self.path2 = [[1, 1, 1.57/2], [3, 1, 0], [3, -3, -2.36], [-3, -3, 1.57], [-3, 0, 1.57], [0, 0, 0]]
+        self.path = [[1, 1, 1.57/2], [3, 1, 0], [3, -3, -2.36], [-3, -3, 1.57], [-3, 0, 1.57], [0, 0, 0]]
                 
     def publish_goal(self, goal_pose):
         marker = Marker()
@@ -154,7 +153,7 @@ class pioneer_control(object):
         z = msg.pose.orientation.z
         w = msg.pose.orientation.w
         thetat = euler_from_quaternion([x, y, z, w])[-1]
-        # self.goal_pose = [xt, yt, thetat]        
+        self.goal_pose = [xt, yt, thetat]        
 
     def get_robot_actual_pose(self):      
         """
@@ -251,10 +250,11 @@ class pioneer_control(object):
 
         plt.subplot(414)
         plt.xlabel('tempo (s)')
-        plt.ylabel('Coordenada X (m)')
-        plt.yticks(np.arange(0, 3, 0.5))
+        plt.plot(self.time_interval, self.control_state_dist_r, 'k', label='Distance')
+        plt.plot(self.time_interval, self.control_state_heading, 'r', label='Heading angle')
+        plt.plot(self.time_interval, self.control_state_theta, 'b', label='Theta')
+        plt.legend()
         plt.grid()
-        plt.plot(self.time_interval, self.odometry_path_x[0:-1])
         plt.show()
     
     def save_array_to_csv(self, string):
@@ -281,6 +281,11 @@ class pioneer_control(object):
                            "left_wheel_angular" : self.left_wheel_angular_velocity,
                            "right_wheel_angular" : self.right_wheel_angular_velocity})
         df.to_csv(script_path + "/" + "robot_velocities" + "_" + string + ".csv", index=False)
+
+        df = pd.DataFrame({"dist_r" : self.control_state_dist_r,
+                           "heading_angle" : self.control_state_heading,
+                           "theta" : self.control_state_theta})
+        df.to_csv(script_path + "/" + "control_states" + "_" + string + ".csv", index=False)
     
     def diff_slow_down_model(self, vx, w):
         """
@@ -420,15 +425,15 @@ class pioneer_control(object):
         dt = 0.15 # Time interval
         dist_r = 10
         
-        ###########################
+        ##############################
         # Control parameters
         k1 = 1
         k2 = 3
         beta = 0.4
         lambda_ = 2
-        ###########################
+        ##############################
         
-        ###########################
+        ##############################
         # Parameters for transition
         # between points in the path
         threshold_distance_goal = 0.1
@@ -448,19 +453,16 @@ class pioneer_control(object):
         speed_up_time_current = 0
         speed_up_time_limit = 1
         speed_up_mode = 0
-        ###########################
+        ##############################
 
         time = 0
-        path_points = len(self.path2)
+        path_points = len(self.path)
+        print("Path points: ", path_points)
         path_iter = 0
-        count_ = 0
-        count2_ = 0
-        count3_ = 0
-        ended_slow_down_mode = 0
-        ended_transition_mode = 0
-        print("Path points: " + str(path_points))
+        count_, count2_, count3_ = 0, 0, 0
+        ended_slow_down_mode, ended_transition_mode = 0, 0
         while path_iter < path_points:
-            goal_pose = self.path2[path_iter]
+            goal_pose = self.path[path_iter]
             print("Goal pose: ", goal_pose)
             
             # Last odometry data
@@ -533,9 +535,9 @@ class pioneer_control(object):
                         w_initial2 = w
                         ended_slow_down_mode = 0
                 
-                #-------------------------------
+                #-------------------------------------------
                 # STARTS THE SPEED UP LINEAR VELOCITY AGAIN
-                #-------------------------------
+                #-------------------------------------------
                 if ended_transition_mode:
                     count3_ += 1
                     speed_up_mode = 1
@@ -556,12 +558,21 @@ class pioneer_control(object):
                 ##########################################
                 # Calculate the control signals
                 ##########################################
-                if path_iter + 1 < path_points:
-                    heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path2[path_iter+1])
+                # Need to be improved
+                if path_points == len(self.path):
+                    if transition_mode or speed_up_mode:
+                        if path_iter + 1 < path_points:
+                            heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path[path_iter+1])
+                        else:
+                            heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path[-1])
                 else:
-                    heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path2[-1])
-                
+                    heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path[path_iter+1])
+
                 curvature = -1/dist_r * (k2*(heading_angle - atan(-k1*theta)) + (1 + k1/(1+(k1*theta)**2))*sin(heading_angle))
+
+                self.control_state_theta.append(theta)
+                self.control_state_heading.append(heading_angle)
+                self.control_state_dist_r.append(dist_r)
 
                 if slow_down_mode:
                     # during the transition, the linear velocity is held constant
@@ -627,9 +638,3 @@ def main():
     
 if __name__ == "__main__":
     main()
-
-# print("Angular velocity: ", w)
-# print("Linear velocity: ", vx)
-# print("Dist_r: ", dist_r)
-# print("Curvature: ", curvature)
-# print('\n')
