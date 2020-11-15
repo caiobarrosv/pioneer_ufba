@@ -269,10 +269,15 @@ class pioneer_control(object):
         df = pd.DataFrame({"x" : self.odometry_path_x, "y" : self.odometry_path_y})
         df.to_csv(script_path + "/" + "robot_path" + "_" + string + ".csv", index=False)
 
+        print("len_time: ", len(self.time_interval))
+        print("robot_linear_velocity: ", len(self.robot_linear_velocity))
+        print("robot_angular_velocity: ", len(self.robot_angular_velocity))
+        print("left_wheel_angular_velocity: ", len(self.left_wheel_angular_velocity))
+        print("right_wheel_angular_velocity: ", len(self.right_wheel_angular_velocity))
+
         df = pd.DataFrame({"time_interval" : self.time_interval, 
                            "linear_velocity" : self.robot_linear_velocity, 
                            "angular_velocity" : self.robot_angular_velocity,
-                           "path_curvature" : self.path_curvature,
                            "left_wheel_angular" : self.left_wheel_angular_velocity,
                            "right_wheel_angular" : self.right_wheel_angular_velocity})
         df.to_csv(script_path + "/" + "robot_velocities" + "_" + string + ".csv", index=False)
@@ -609,7 +614,7 @@ class pioneer_control(object):
             print("Path_iter: ", path_iter)
             
         self.publish_robot_vel(0, 0) # Stop the robot
-        # self.save_array_to_csv("path") # Save the coordinates in csv files
+        self.save_array_to_csv("path") # Save the coordinates in csv files
         self.plot_path() # plot the paths
 
 def main():
