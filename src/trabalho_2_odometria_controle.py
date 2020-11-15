@@ -426,7 +426,7 @@ class pioneer_control(object):
         ###########################
         # Parameters for transition
         # between points in the path
-        threshold_distance_goal = 0.04
+        threshold_distance_goal = 0.1
         
         transition_desired_velocity = 0.3
         
@@ -437,7 +437,7 @@ class pioneer_control(object):
 
         transition_threshold_distance = 0.1
         transition_time_current = 0
-        transition_time_limit = 0.5
+        transition_time_limit = 1
         transition_mode = 0
 
         speed_up_time_current = 0
@@ -446,7 +446,7 @@ class pioneer_control(object):
         ###########################
 
         time = 0
-        path_points = 2# len(self.path2)
+        path_points = len(self.path2)
         path_iter = 0
         count_ = 0
         count2_ = 0
@@ -525,6 +525,7 @@ class pioneer_control(object):
                         count2_ = 0
                         ended_transition_mode = 1
                         v_initial2 = vx
+                        w_initial2 = w
                         ended_slow_down_mode = 0
                 
                 #-------------------------------
@@ -550,36 +551,35 @@ class pioneer_control(object):
                 ##########################################
                 # Calculate the control signals
                 ##########################################
+                if path_iter + 1 < path_points:
+                    heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path2[path_iter+1])
+                else:
+                    heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path2[-1])
+                
                 curvature = -1/dist_r * (k2*(heading_angle - atan(-k1*theta)) + (1 + k1/(1+(k1*theta)**2))*sin(heading_angle))
+
                 if slow_down_mode:
                     # during the transition, the linear velocity is held constant
                     sigmoid = 1/0.98 * (1 / (1 + math.exp(-9.2*(slow_down_time_current/slow_down_time_limit - 0.5))) - 0.01)
                     vx = vel_transition = (1 - sigmoid) * v_initial + sigmoid * transition_desired_velocity
                     w = curvature * vx # angular velocity
                 elif transition_mode:
-                    vx = transition_desired_velocity
-                    
-                    sigmoid = 1/0.98 * (1 / (1 + math.exp(-9.2*(transition_time_current/transition_time_limit - 0.5))) - 0.01)
-                    if path_iter + 1 < path_points:
-                        heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path2[path_iter+1])
-                    else:
-                        heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path2[path_iter])
+                    vx = transition_desired_velocity                    
+                    sigmoid = 1/0.98 * (1 / (1 + math.exp(-9.2*(transition_time_current/transition_time_limit - 0.5))) - 0.01)                    
                     curvature_next = -1/dist_next * (k2*(heading_angle_next - atan(-k1*theta_next)) + (1 + k1/(1+(k1*theta_next)**2))*sin(heading_angle_next))
 
                     w_final = curvature_next * transition_desired_velocity
                     w = vel_transition = (1 - sigmoid) * w_initial + sigmoid * w_final
                 elif speed_up_mode:
-                    if path_iter + 1 < path_points:
-                        heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path2[path_iter+1])
-                    else:
-                        heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path2[path_iter])
                     curvature_next = -1/dist_next * (k2*(heading_angle_next - atan(-k1*theta_next)) + (1 + k1/(1+(k1*theta_next)**2))*sin(heading_angle_next))
                     sigmoid = 1/0.98 * (1 / (1 + math.exp(-9.2*(speed_up_time_current/speed_up_time_limit - 0.5))) - 0.01)
                     
-                    vx_final = v_max / (1 + beta*curvature**lambda_) # linear velocity
-                    vx = vel_transition = (1 - sigmoid) * v_initial2 + sigmoid * vx_final
+                    vx_final2 = v_max / (1 + beta*curvature**lambda_) # linear velocity
+                    vx = vel_transition = (1 - sigmoid) * v_initial2 + sigmoid * vx_final2
 
-                    w = curvature * vx # angular velocity
+                    w_initial2 = curvature_next * transition_desired_velocity
+                    w_final = curvature * vx # angular velocity
+                    w = vel_transition = (1 - sigmoid) * w_initial2 + sigmoid * w_final
                 else:
                     vx = v_max / (1 + beta*curvature**lambda_) # linear velocity
                     w = curvature * vx # angular velocity
