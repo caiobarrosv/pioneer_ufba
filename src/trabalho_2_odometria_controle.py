@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import csv
 import pandas as pd
 import os
+import copy
 
 class pioneer_control(object):
     def __init__(self):
@@ -61,10 +62,16 @@ class pioneer_control(object):
         self.ground_truth_path = []
         self.gt_path_id = 0
         self.path_curvature = []
+        self.vertical_plot_slow_down = []
+        self.vertical_plot_transition = []
+        self.slow_down_flag = []
+        self.transition_flag = []
+        self.speed_up_flag = []
         poses = [[0, 5, 0], [3.54, 3.54, 1.57/2], [5, 0, 0], [4.5, -2.17, -0.785], [2.5, -4.33, -1.57],
                  [0, -5, -1.57], [-3.54, -3.54, -2.36], [-5, 0, -3.14], [-3.54, 3.54, 0]]
         self.goal_pose = poses[1]
-        self.path = [[1, 1, 1.57/2], [3, 1, 0], [3, -3, -2.36], [-3, -3, 1.57], [-3, 0, 1.57], [0, 0, 0]]
+        self.path1 = [[1, 0, 0], [3, 0, 0], [3, -3, -2.36], [-3, -3, 1.57], [-3, 0, 1.57], [0, 0, 0]]
+        self.path2 = [[1, 1, 1.57/2], [3, 1, 0], [3, -3, -2.36], [-3, -3, 1.57], [-3, 0, 1.57], [0, 0, 0]]
                 
     def publish_goal(self, goal_pose):
         marker = Marker()
@@ -195,29 +202,59 @@ class pioneer_control(object):
         """
         Plot the robot ground truth and simulated path
         """
-        plt.figure(1)
-        plt.plot(self.gt_path_x[0], self.gt_path_y[0], 'go')  # mark initial position
-        gt_plot = plt.plot(self.gt_path_x, self.gt_path_y, 'g', label='Ground truth')         # mark path
+        # plt.figure(1)
+        # plt.plot(self.gt_path_x[0], self.gt_path_y[0], 'go')  # mark initial position
+        # gt_plot = plt.plot(self.gt_path_x, self.gt_path_y, 'g', label='Ground truth')         # mark path
 
-        robot_plot = plt.plot(self.odometry_path_x, self.odometry_path_y, 'r', label='Odometria')
+        # robot_plot = plt.plot(self.odometry_path_x, self.odometry_path_y, 'r', label='Odometria')
 
-        plt.title('Robot path comparison')
-        plt.legend()
-        plt.grid()
-        plt.tight_layout()
+        # plt.title('Robot path comparison')
+        # plt.legend()
+        # plt.grid()
+        # plt.tight_layout()
         
         plt.figure(2)
-        plt.subplot(211)
+        plt.subplot(411)
+        plt.plot(self.time_interval, self.slow_down_flag, 'r', label='Slow down flag')
+        plt.plot(self.time_interval, self.transition_flag, 'k', label='Transition flag')
+        plt.plot(self.time_interval, self.speed_up_flag, 'b', label='Speed up flag')
+        plt.legend()
+        plt.grid()
+
+        plt.subplot(412)
         plt.plot(self.time_interval, self.robot_linear_velocity)
+        
+        for i in range(len(self.vertical_plot_slow_down)):
+            plt.vlines(self.vertical_plot_slow_down[i], 0, 0.7, 'g', 'dashed')
+        
+        for i in range(len(self.vertical_plot_transition)):
+            plt.vlines(self.vertical_plot_transition[i], 0, 0.7, 'r', 'dashdot')
+
         plt.xlabel('tempo (s)')
         plt.ylabel('Velocidade Linear (m/s)')
         plt.grid()
-        plt.subplot(212)
+        plt.yticks(np.arange(0, 0.7, 0.1))
+
+        plt.subplot(413)
         plt.xlabel('tempo (s)')
         plt.ylabel('Velocidade Angular (rad/s)')
         plt.grid()
         plt.plot(self.time_interval, self.robot_angular_velocity)
 
+        for i in range(len(self.vertical_plot_slow_down)):
+            plt.vlines(self.vertical_plot_slow_down[i], -0.5, 0.5, 'g', 'dashed')
+        
+        for i in range(len(self.vertical_plot_transition)):
+            plt.vlines(self.vertical_plot_transition[i], -0.5, 0.5, 'r', 'dashed')
+
+        plt.yticks(np.arange(-0.5, 0.5, 0.1))
+
+        plt.subplot(414)
+        plt.xlabel('tempo (s)')
+        plt.ylabel('Coordenada X (m)')
+        plt.yticks(np.arange(0, 3, 0.5))
+        plt.grid()
+        plt.plot(self.time_interval, self.odometry_path_x[0:-1])
         plt.show()
     
     def save_array_to_csv(self, string):
@@ -240,7 +277,7 @@ class pioneer_control(object):
                            "right_wheel_angular" : self.right_wheel_angular_velocity})
         df.to_csv(script_path + "/" + "robot_velocities" + "_" + string + ".csv", index=False)
     
-    def diff_model(self, vx, w):
+    def diff_slow_down_model(self, vx, w):
         """
         Calculate the wheel angular velocities based on the linear and angular 
         velocities of the robot
@@ -291,7 +328,7 @@ class pioneer_control(object):
         L = self.L
         r = self.r
         
-        we, wd, ve, vd = self.diff_model(vx, w)
+        we, wd, ve, vd = self.diff_slow_down_model(vx, w)
 
         self.right_wheel_angular_velocity.append(wd)
         self.left_wheel_angular_velocity.append(we)
@@ -322,7 +359,7 @@ class pioneer_control(object):
         self.update_odometry_state(pose, theta)
         self.publish_path_rviz_odometry(pose)
     
-    def get_robot_state_control(self, odometry_pose, goal_pose):
+    def get_robot_state_control(self, goal_pose):
         """
         Calculate the robot states as heading angle, theta, phi, and distance rom the target
 
@@ -334,8 +371,12 @@ class pioneer_control(object):
             theta (float):Angle between the target orientation and the line of sight between the robot and the target
             disrt_r (float):Distance between the robot and the target
         """
+        x = self.odometry_path_x[-1]
+        y = self.odometry_path_y[-1]
+        theta = self.odometry_orientation[-1]
+
         [xt, yt, target_angle] = goal_pose
-        [xr, yr, robot_angle] = odometry_pose
+        [xr, yr, robot_angle] = [x, y, theta]
 
         phi = atan2(yt - yr, xt - xr)
         
@@ -356,53 +397,16 @@ class pioneer_control(object):
 
         return heading_angle, theta, dist_r
     
-    def control_loop(self, v_max, vx, heading_angle, theta, dist_r, transition_velocity, mode, transition_time_total):
-        """
-        Calculates the linar and angular velocity based on the paper entitled
-        "A Smooth Control Law for Graceful Motion of Differential Wheeled Mobile Robots in 2D Environment" (Park and Kuipers, 2011)
-        
-        Parameters:
-            v_max (float):Max linear velocity of the robot
-
-        Returns:
-            vx (float):Linear velocity (m/s)
-            w (float):Angular velocity (rad/s)
-            disrt_r (float):Distance between the robot and the target
-        """
-        # Control parameters
-        k1 = 1
-        k2 = 3
-        beta = 0.4
-        lambda_ = 2
-
-        # w = -v_max/dist_r * (k2*(heading_angle - atan(-k1*theta)) + (1 + k1/(1+(k1*theta)**2))*sin(heading_angle))
-        # vx = v_max
-
-        curvature = -1/dist_r * (k2*(heading_angle - atan(-k1*theta)) + (1 + k1/(1+(k1*theta)**2))*sin(heading_angle))
-        self.path_curvature.append(curvature)
-
-        if mode:
-            sigmoid = 1/0.98 * (1 /     (1 + math.exp(-9.2*(transition_time_total - 0.5))) - 0.01)
-            vx = vel_transition = (1 - sigmoid)*vx + sigmoid*transition_velocity
-        else:
-            vx = v_max / (1 + beta*curvature**lambda_) # linear velocity
-        
-        w = curvature * vx # angular velocity
-        # print("Linear velocity: ", vx)
-        # print("Angular velocity: ", w)
-        
-        self.robot_linear_velocity.append(vx)
-        self.robot_angular_velocity.append(w)
-                
-        return vx, w
     
     def main_control(self):
         """
         Control the robot based on the Odometry data (calculated using the ICC method)
         and compares with the ground truth from Gazebo
         """
-        v_max = 0.4 # linear velocity
+        v_max = 0.5 # linear velocity
         vx = v_max
+        v_initial= 0
+        w_initial = 0
                                 
         raw_input("Choose a goal and then press Enter to start the simulation.")
         
@@ -412,32 +416,52 @@ class pioneer_control(object):
         dist_r = 10
         
         ###########################
+        # Control parameters
+        k1 = 1
+        k2 = 3
+        beta = 0.4
+        lambda_ = 2
+        ###########################
+        
+        ###########################
         # Parameters for transition
         # between points in the path
-        threshold_distance = 0.04
-        threshold_transition_distance = 0.1
-        transition_velocity = 0.2
-        transition_time_limit = 1
-        transition_time_total = 0
-        mode = 0
+        threshold_distance_goal = 0.04
+        
+        transition_desired_velocity = 0.3
+        
+        threshold_slow_down_distance = 0.3
+        slow_down_time_current = 0
+        slow_down_time_limit = 0.5
+        slow_down_mode = 0
+
+        transition_threshold_distance = 0.1
+        transition_time_current = 0
+        transition_time_limit = 0.5
+        transition_mode = 0
+
+        speed_up_time_current = 0
+        speed_up_time_limit = 1
+        speed_up_mode = 0
         ###########################
 
         time = 0
-        path_points = 2 #len(self.path)
+        path_points = 2# len(self.path2)
         path_iter = 0
-        raw_input("Path points: " + str(path_points))
+        count_ = 0
+        count2_ = 0
+        count3_ = 0
+        ended_slow_down_mode = 0
+        ended_transition_mode = 0
+        print("Path points: " + str(path_points))
         while path_iter < path_points:
-            goal_pose = self.path[path_iter]
+            goal_pose = self.path2[path_iter]
             print("Goal pose: ", goal_pose)
             
             # Last odometry data
-            x = self.odometry_path_x[-1]
-            y = self.odometry_path_y[-1]
-            theta = self.odometry_orientation[-1]
-            robot_pose_odometry = [x, y, theta]
-            _, _, dist_r = self.get_robot_state_control(robot_pose_odometry, goal_pose)
+            _, _, dist_r = self.get_robot_state_control(goal_pose)
             
-            while not rospy.is_shutdown() and dist_r > threshold_distance:
+            while not rospy.is_shutdown() and dist_r > threshold_distance_goal:
                 # Plot the goal in RVIZ
                 self.publish_goal(goal_pose)
 
@@ -447,27 +471,125 @@ class pioneer_control(object):
                 self.publish_path_rviz_ground_truth(gt_pose)
 
                 # Last odometry data
-                x = self.odometry_path_x[-1]
-                y = self.odometry_path_y[-1]
-                theta = self.odometry_orientation[-1]
-                robot_pose_odometry = [x, y, theta]
+                heading_angle, theta, dist_r = self.get_robot_state_control(goal_pose)
 
-                heading_angle, theta, dist_r = self.get_robot_state_control(robot_pose_odometry, goal_pose)
+                ##########################################
+                # TRANSITIONS
+                ##########################################
+                #-------------------------------
+                # STARTS THE SLOWING DOWN PROCESS
+                #-------------------------------
+                if transition_threshold_distance < dist_r and dist_r < threshold_slow_down_distance:
+                    count_ += 1
+                    slow_down_mode = 1 # Starts to slow down mode 
+                    ended_slow_down_mode = 0
+                    if count_ < 2:
+                        # memorize the initial velocity and the time when the transitions starts
+                        v_initial = vx
+                        self.vertical_plot_slow_down.append(time)
 
-                if dist_r < threshold_transition_distance:
-                    mode = 1 # indicates a transition near the point in the path
-    
-                if mode == 1 and transition_time_total < transition_time_limit:
-                    transition_time_total += dt
+                # The slow down occurs for a fixed period of time
+                if slow_down_mode and slow_down_time_current < slow_down_time_limit:
+                    slow_down_time_current += dt
+                    ended_slow_down_mode = 0
                 else:
-                    transition_time_total = 0 # reset the transition time
-                    mode = 0 # robot is not near a point in the path
+                    # memorize when the time when the slow down stops
+                    if slow_down_mode:
+                        self.vertical_plot_slow_down.append(time)
+                        slow_down_time_current = 0 # reset the transition time
+                        v_initial = 0 # reset v_initial
+                        slow_down_mode = 0 # slow down has ended
+                        count_ = 0
+                        w_initial = w
+                        ended_slow_down_mode = 1
                 
-                # print("Mode: ", mode)
-                # print("Transition time total: ", transition_time_total)
+                #-------------------------------
+                # STARTS THE TRANSITION PROCESS
+                #-------------------------------
+                if ended_slow_down_mode:
+                    count2_ += 1
+                    transition_mode = 1 # A transition starts
+                    if count2_ < 2:
+                        # w_intial = w
+                        self.vertical_plot_transition.append(time)
+                
+                # The transition occurs for a fixed period of time
+                if transition_mode and transition_time_current < transition_time_limit:
+                    transition_time_current += dt
+                    ended_transition_mode = 0
+                else:
+                    if count2_ > 0:
+                        self.vertical_plot_transition.append(time)
+                        transition_time_current = 0
+                        transition_mode = 0
+                        count2_ = 0
+                        ended_transition_mode = 1
+                        v_initial2 = vx
+                        ended_slow_down_mode = 0
+                
+                #-------------------------------
+                # STARTS THE SPEED UP LINEAR VELOCITY AGAIN
+                #-------------------------------
+                if ended_transition_mode:
+                    count3_ += 1
+                    speed_up_mode = 1
 
+                if speed_up_mode and speed_up_time_current < speed_up_time_limit:
+                    speed_up_time_current += dt
+                else:
+                    if count3_ > 0:
+                        speed_up_time_current = 0
+                        speed_up_mode = 0
+                        count3_ = 0
+                        ended_transition_mode = 0
+
+                self.slow_down_flag.append(slow_down_mode)
+                self.transition_flag.append(transition_mode)
+                self.speed_up_flag.append(speed_up_mode)
+
+                ##########################################
                 # Calculate the control signals
-                vx, w = self.control_loop(v_max, vx, heading_angle, theta, dist_r, transition_velocity, mode, transition_time_total)
+                ##########################################
+                curvature = -1/dist_r * (k2*(heading_angle - atan(-k1*theta)) + (1 + k1/(1+(k1*theta)**2))*sin(heading_angle))
+                if slow_down_mode:
+                    # during the transition, the linear velocity is held constant
+                    sigmoid = 1/0.98 * (1 / (1 + math.exp(-9.2*(slow_down_time_current/slow_down_time_limit - 0.5))) - 0.01)
+                    vx = vel_transition = (1 - sigmoid) * v_initial + sigmoid * transition_desired_velocity
+                    w = curvature * vx # angular velocity
+                elif transition_mode:
+                    vx = transition_desired_velocity
+                    
+                    sigmoid = 1/0.98 * (1 / (1 + math.exp(-9.2*(transition_time_current/transition_time_limit - 0.5))) - 0.01)
+                    if path_iter + 1 < path_points:
+                        heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path2[path_iter+1])
+                    else:
+                        heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path2[path_iter])
+                    curvature_next = -1/dist_next * (k2*(heading_angle_next - atan(-k1*theta_next)) + (1 + k1/(1+(k1*theta_next)**2))*sin(heading_angle_next))
+
+                    w_final = curvature_next * transition_desired_velocity
+                    w = vel_transition = (1 - sigmoid) * w_initial + sigmoid * w_final
+                elif speed_up_mode:
+                    if path_iter + 1 < path_points:
+                        heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path2[path_iter+1])
+                    else:
+                        heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path2[path_iter])
+                    curvature_next = -1/dist_next * (k2*(heading_angle_next - atan(-k1*theta_next)) + (1 + k1/(1+(k1*theta_next)**2))*sin(heading_angle_next))
+                    sigmoid = 1/0.98 * (1 / (1 + math.exp(-9.2*(speed_up_time_current/speed_up_time_limit - 0.5))) - 0.01)
+                    
+                    vx_final = v_max / (1 + beta*curvature**lambda_) # linear velocity
+                    vx = vel_transition = (1 - sigmoid) * v_initial2 + sigmoid * vx_final
+
+                    w = curvature * vx # angular velocity
+                else:
+                    vx = v_max / (1 + beta*curvature**lambda_) # linear velocity
+                    w = curvature * vx # angular velocity
+
+                ##########################################
+                # Update states and publish to robot
+                ##########################################
+
+                self.robot_linear_velocity.append(vx)
+                self.robot_angular_velocity.append(w)
 
                 # Update the robot ground truth state
                 self.update_robot_gt_state(gt_pose[0:2], gt_pose[-1])
@@ -482,11 +604,12 @@ class pioneer_control(object):
                 self.time_interval.append(time) # Used to plot the data
 
                 rospy.sleep(dt)
-            path_iter += 1
 
+            path_iter += 1
+            print("Path_iter: ", path_iter)
             
         self.publish_robot_vel(0, 0) # Stop the robot
-        self.save_array_to_csv("path") # Save the coordinates in csv files
+        # self.save_array_to_csv("path") # Save the coordinates in csv files
         self.plot_path() # plot the paths
 
 def main():
@@ -499,3 +622,9 @@ def main():
     
 if __name__ == "__main__":
     main()
+
+# print("Angular velocity: ", w)
+# print("Linear velocity: ", vx)
+# print("Dist_r: ", dist_r)
+# print("Curvature: ", curvature)
+# print('\n')
