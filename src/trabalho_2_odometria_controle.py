@@ -21,11 +21,14 @@ class pioneer_control(object):
         ####################
         self.robot_cmd_vel = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
 
-        self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.move_goal_callback, queue_size=1)
-
         self.odometry_path_pub = rospy.Publisher('/path_odometry', Path, queue_size=1)
         self.gt_path_pub = rospy.Publisher('/path_ground_truth', Path, queue_size=1)
         self.vis_pub = rospy.Publisher('marker_goal', Marker, queue_size=1)
+
+        #####################
+        # DECLARE SUBSCRIBERS
+        #####################
+        self.goal_sub = rospy.Subscriber('/base_pose_ground_truth', Odometry, self.base_pose_ground_truth_callback, queue_size=1)
         
         ####################
         # ROBOT PARAMETERS
@@ -51,11 +54,16 @@ class pioneer_control(object):
         self.odometry_path_x = [odometry_position[0]] 
         self.odometry_path_y = [odometry_position[1]]
         self.odometry_orientation = [odometry_position[-1]]
-        self.robot_linear_velocity = []
-        self.robot_angular_velocity = []
+        self.robot_linear_velocity_odometry = []
+        self.robot_angular_velocity_odometry = []
+        self.left_wheel_angular_velocity_odometry = []
+        self.right_wheel_angular_velocity_odometry = []        
+        self.left_wheel_angular_velocity_ground_truth_list = []
+        self.right_wheel_angular_velocity_ground_truth_list = []
+        self.robot_linear_velocity_ground_truth_list = []
+        self.robot_angular_velocity_ground_truth_list = []
+        
         self.time_interval = []
-        self.left_wheel_angular_velocity = []
-        self.right_wheel_angular_velocity = []
 
         self.control_state_theta = []
         self.control_state_heading = []
@@ -71,6 +79,12 @@ class pioneer_control(object):
         self.transition_flag = []
         self.speed_up_flag = []
         self.path = [[1, 1, 1.57/2], [3, 1, 0], [3, -3, -2.36], [-3, -3, 1.57], [-3, 0, 1.57], [0, 0, 0]]
+            
+    def base_pose_ground_truth_callback(self, msg):
+        linear_x = msg.twist.twist.linear.x
+        linear_y = msg.twist.twist.linear.y
+        self.robot_linear_velocity_ground_truth = math.sqrt(linear_x**2 + linear_y**2)
+        self.robot_angular_velocity_ground_truth = msg.twist.twist.angular.z
                 
     def publish_goal(self, goal_pose):
         marker = Marker()
@@ -221,7 +235,8 @@ class pioneer_control(object):
         plt.grid()
 
         plt.subplot(412)
-        plt.plot(self.time_interval, self.robot_linear_velocity)
+        plt.plot(self.time_interval, self.robot_linear_velocity_odometry, 'k', label='Odometry')
+        plt.plot(self.time_interval, self.robot_linear_velocity_ground_truth_list, 'r', label='Ground Truth')
         
         for i in range(len(self.vertical_plot_slow_down)):
             plt.vlines(self.vertical_plot_slow_down[i], 0, 0.7, 'g', 'dashed')
@@ -238,7 +253,8 @@ class pioneer_control(object):
         plt.xlabel('tempo (s)')
         plt.ylabel('Velocidade Angular (rad/s)')
         plt.grid()
-        plt.plot(self.time_interval, self.robot_angular_velocity)
+        plt.plot(self.time_interval, self.robot_angular_velocity_odometry, 'k', label='Odometry')
+        plt.plot(self.time_interval, self.robot_angular_velocity_ground_truth_list, 'r', label='Ground Truth')
 
         for i in range(len(self.vertical_plot_slow_down)):
             plt.vlines(self.vertical_plot_slow_down[i], -0.5, 0.5, 'g', 'dashed')
@@ -256,6 +272,17 @@ class pioneer_control(object):
         plt.legend()
         plt.grid()
         plt.show()
+
+        plt.figure(3)
+        plt.subplot(211)
+        plt.plot(self.time_interval, self.left_wheel_angular_velocity_ground_truth_list, 'k', label='Left Wheel GT')
+        plt.plot(self.time_interval, self.left_wheel_angular_velocity_odometry, 'r', label='Left Wheel Odometry')
+        plt.subplot(212)
+        plt.plot(self.time_interval, self.right_wheel_angular_velocity_ground_truth_list, 'k', label='Right Wheel GT')
+        plt.plot(self.time_interval, self.right_wheel_angular_velocity_odometry, 'r', label='Right Wheel Odometry')
+        plt.legend()
+        plt.grid()
+        plt.show()
     
     def save_array_to_csv(self, string):
         """
@@ -263,23 +290,27 @@ class pioneer_control(object):
         """
         script_path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'csv_files'))
         
-        df = pd.DataFrame({"x" : self.gt_path_x, "y" : self.gt_path_y})
+        df = pd.DataFrame({"x" : self.gt_path_x, "y" : self.gt_path_y, "theta" : self.gt_orientation})
         df.to_csv(script_path + "/" + "ground_truth_path" + "_" + string + ".csv", index=False)
 
-        df = pd.DataFrame({"x" : self.odometry_path_x, "y" : self.odometry_path_y})
+        df = pd.DataFrame({"x" : self.odometry_path_x, "y" : self.odometry_path_y, "theta" : self.odometry_orientation})
         df.to_csv(script_path + "/" + "robot_path" + "_" + string + ".csv", index=False)
 
         print("len_time: ", len(self.time_interval))
-        print("robot_linear_velocity: ", len(self.robot_linear_velocity))
-        print("robot_angular_velocity: ", len(self.robot_angular_velocity))
-        print("left_wheel_angular_velocity: ", len(self.left_wheel_angular_velocity))
-        print("right_wheel_angular_velocity: ", len(self.right_wheel_angular_velocity))
+        print("robot_linear_velocity_odometry: ", len(self.robot_linear_velocity_odometry))
+        print("robot_angular_velocity_odometry: ", len(self.robot_angular_velocity_odometry))
+        print("left_wheel_angular_velocity_odometry: ", len(self.left_wheel_angular_velocity_odometry))
+        print("right_wheel_angular_velocity_odometry: ", len(self.right_wheel_angular_velocity_odometry))
 
         df = pd.DataFrame({"time_interval" : self.time_interval, 
-                           "linear_velocity" : self.robot_linear_velocity, 
-                           "angular_velocity" : self.robot_angular_velocity,
-                           "left_wheel_angular" : self.left_wheel_angular_velocity,
-                           "right_wheel_angular" : self.right_wheel_angular_velocity})
+                           "linear_velocity_odometry" : self.robot_linear_velocity_odometry, 
+                           "angular_velocity_odometry" : self.robot_angular_velocity_odometry,
+                           "left_wheel_angular_odometry" : self.left_wheel_angular_velocity_odometry,
+                           "right_wheel_angular_odometry" : self.right_wheel_angular_velocity_odometry,
+                           "linear_velocity_ground_truth" : self.robot_linear_velocity_ground_truth_list, 
+                           "angular_velocity_ground_truth" : self.robot_angular_velocity_ground_truth_list,
+                           "left_wheel_angular_ground_truth" : self.left_wheel_angular_velocity_ground_truth_list,
+                           "right_wheel_angular_ground_truth" : self.right_wheel_angular_velocity_ground_truth_list})
         df.to_csv(script_path + "/" + "robot_velocities" + "_" + string + ".csv", index=False)
 
         df = pd.DataFrame({"dist_r" : self.control_state_dist_r,
@@ -340,8 +371,8 @@ class pioneer_control(object):
         
         we, wd, ve, vd = self.diff_slow_down_model(vx, w)
 
-        self.right_wheel_angular_velocity.append(wd)
-        self.left_wheel_angular_velocity.append(we)
+        self.right_wheel_angular_velocity_odometry.append(wd)
+        self.left_wheel_angular_velocity_odometry.append(we)
 
         # Last odometry data
         x = self.odometry_path_x[-1]
@@ -369,7 +400,7 @@ class pioneer_control(object):
         self.update_odometry_state(pose, theta)
         self.publish_path_rviz_odometry(pose)
     
-    def get_robot_state_control(self, goal_pose):
+    def get_robot_state_control_odometry(self, goal_pose):
         """
         Calculate the robot states as heading angle, theta, phi, and distance rom the target
 
@@ -466,7 +497,7 @@ class pioneer_control(object):
             print("Goal pose: ", goal_pose)
             
             # Last odometry data
-            _, _, dist_r = self.get_robot_state_control(goal_pose)
+            _, _, dist_r = self.get_robot_state_control_odometry(goal_pose)
             
             while not rospy.is_shutdown() and dist_r > threshold_distance_goal:
                 # Plot the goal in RVIZ
@@ -478,7 +509,7 @@ class pioneer_control(object):
                 self.publish_path_rviz_ground_truth(gt_pose)
 
                 # Last odometry data
-                heading_angle, theta, dist_r = self.get_robot_state_control(goal_pose)
+                heading_angle, theta, dist_r = self.get_robot_state_control_odometry(goal_pose)
 
                 ##########################################
                 # TRANSITIONS
@@ -562,11 +593,11 @@ class pioneer_control(object):
                 if path_points == len(self.path):
                     if transition_mode or speed_up_mode:
                         if path_iter + 1 < path_points:
-                            heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path[path_iter+1])
+                            heading_angle_next, theta_next, dist_next = self.get_robot_state_control_odometry(self.path[path_iter+1])
                         else:
-                            heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path[-1])
+                            heading_angle_next, theta_next, dist_next = self.get_robot_state_control_odometry(self.path[-1])
                 else:
-                    heading_angle_next, theta_next, dist_next = self.get_robot_state_control(self.path[path_iter+1])
+                    heading_angle_next, theta_next, dist_next = self.get_robot_state_control_odometry(self.path[path_iter+1])
 
                 curvature = -1/dist_r * (k2*(heading_angle - atan(-k1*theta)) + (1 + k1/(1+(k1*theta)**2))*sin(heading_angle))
 
@@ -604,9 +635,16 @@ class pioneer_control(object):
                 # Update states and publish to robot
                 ##########################################
 
-                self.robot_linear_velocity.append(vx)
-                self.robot_angular_velocity.append(w)
+                self.robot_linear_velocity_ground_truth_list.append(self.robot_linear_velocity_ground_truth)
+                self.robot_angular_velocity_ground_truth_list.append(self.robot_angular_velocity_ground_truth)
 
+                we_gt, wd_gt, _, _ = self.diff_slow_down_model(self.robot_linear_velocity_ground_truth, self.robot_angular_velocity_ground_truth)
+                self.left_wheel_angular_velocity_ground_truth_list.append(we_gt)
+                self.right_wheel_angular_velocity_ground_truth_list.append(wd_gt)
+
+                self.robot_linear_velocity_odometry.append(vx)
+                self.robot_angular_velocity_odometry.append(w)
+                
                 # Update the robot ground truth state
                 self.update_robot_gt_state(gt_pose[0:2], gt_pose[-1])
 
