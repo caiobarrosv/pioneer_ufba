@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+    <!-- Include move base launch file -->
+  	<!-- Use with Pioneer Gazebo simulation and Pioneer3dx robot platform -->
+  	<include file="$(find pioneer_ufba)/launch/move_base.launch"/>
+
+	<!-- Load the map -->
+	<node name="map_server" pkg="map_server" type="map_server" args="$(find pioneer_ufba)/maps/mymap2.yaml"/>
+</launch>

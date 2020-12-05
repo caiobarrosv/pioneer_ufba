@@ -12,10 +12,11 @@
     <arg name="namespace_arg" default=""/>
 	<arg name="model" default="$(find pioneer_ufba)/urdf/pioneer3dx.xacro"/>
 
+	<!-- <include file="$(find husky_gazebo)/launch/playpen.launch" /> -->
 	<!-- We resume the logic in empty_world.launch, changing only the name of 
 		the world to be launched -->
 	<include file="$(find gazebo_ros)/launch/empty_world.launch">
-		<!-- <arg name="world_name" default="$(find pioneer_ufba)/worlds/lar.world" doc="Default world"/> -->
+		<arg name="world_name" default="$(find pioneer_ufba)/worlds/lar.world" doc="Default world"/>
 		<arg name="debug" value="$(arg debug)" />
 		<arg name="gui" value="$(arg gui)" />
 		<arg name="paused" value="$(arg paused)" />
@@ -23,15 +24,16 @@
 		<arg name="headless" value="$(arg headless)" />
 	</include>
 
+	<!-- Load the URDF into the ROS Parameter Server -->
+	<param name="robot_description" command="$(find xacro)/xacro --inorder $(arg model)"/>
+
 	<!-- Include move base launch file -->
   	<!-- Use with Pioneer Gazebo simulation and Pioneer3dx robot platform -->
-  	<!-- <include file="$(find pioneer_ufba)/launch/move_base.launch"/> -->
+  	<include file="$(find pioneer_ufba)/launch/move_base.launch"/>
 
 	<!-- Load the map -->
-	<!-- <node name="map_server" pkg="map_server" type="map_server" args="$(find pioneer_ufba)/maps/mymap2.yaml"/> -->
-
-    <!-- Load the URDF into the ROS Parameter Server -->
-	<param name="robot_description" command="$(find xacro)/xacro --inorder $(arg model)"/>
+	<node name="map_server" pkg="map_server" type="map_server" args="$(find pioneer_ufba)/maps/mymap3.yaml"/>
+	<!-- <node name="map_server" pkg="map_server" type="map_server" args="$(find pioneer_ufba)/maps/playpen_map.yaml"/> -->
 
 	<node name="pioneer_tf_broadcaster" pkg="pioneer_ufba" type="pioneer_tf_broadcaster"/>
 	<node name="pioneer_odom_publisher" pkg="pioneer_ufba" type="pioneer_odom_publisher"/>
@@ -41,10 +43,13 @@
                 a URDF robot -Y -1.57-->
 	<node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen" 
 		  args="-urdf 
-		  		-z 0.1
+		  		-x -3
+				-y -3.5
+				-z 0.1
+				-Y 0
 		  		-model p3dx 
 		  	    -param robot_description"/>
-				
+	
 	<node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
     	<param name="use_gui" value="false" />
   	</node>

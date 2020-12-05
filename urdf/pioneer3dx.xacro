@@ -169,7 +169,7 @@ work original in ucs-ros-pkg.
 	<xacro:p3dx_wheel suffix="left" parent="base_link" reflect="-1"/>
 	<xacro:p3dx_wheel suffix="right" parent="base_link" reflect="1"/>
 	<!-- front_sonar -->
-	<link name="front_sonar">
+	<!-- <link name="front_sonar">
 		<inertial>
 			<mass value="0.0001" />
 			<origin xyz="0 0 0" />
@@ -193,9 +193,9 @@ work original in ucs-ros-pkg.
 		<origin rpy="0 0 0" xyz="0.109 0 0.209" />
 		<parent link="base_link" />
 		<child link="front_sonar" />
-	</joint>
+	</joint> -->
 	<!-- lms100 laser -->
-	<link name="lms100">
+	<!-- <link name="lms100">
 		<inertial>
 			<mass value="1e-5" />
 			<origin xyz="0 0 0" rpy="0 0 0" />
@@ -219,5 +219,5 @@ work original in ucs-ros-pkg.
 		<origin xyz="0.12 0 0.26" rpy="0 0 0" />
 		<parent link="base_link" />
 		<child link="lms100" />
-	</joint>
+	</joint> -->
 </robot>

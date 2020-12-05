@@ -78,7 +78,9 @@ class pioneer_control(object):
         self.slow_down_flag = []
         self.transition_flag = []
         self.speed_up_flag = []
-        self.path = [[1, 1, 1.57/2], [3, 1, 0], [3, -3, -2.36], [-3, -3, 1.57], [-3, 0, 1.57], [0, 0, 0]]
+        # self.path = [[1, 1, 1.57/2], [3, 1, 0], [3, -3, -2.36], [-3, -3, 1.57], [-3, 0, 1.57], [0, 0, 0]]
+        self.path = [[-1, -3, 1.57], [-1, -1, 1.57/2], [1, -0.5, 0], [1.5, 1.5, 3*math.pi/4], [1, 3, 3*math.pi/4], 
+                     [0, 3.4, math.pi], [-1, 2, -math.pi/4], [1, 1.5, 0]]
             
     def base_pose_ground_truth_callback(self, msg):
         linear_x = msg.twist.twist.linear.x
